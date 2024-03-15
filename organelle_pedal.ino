@@ -28,7 +28,7 @@ Bounce switches[] = {
  * expression pedal is at 33, the value will only change when the
  * expression pedal reads 50 or more (HIGHER).
  */
-int targetValues[] = {-1, -1, -1, -1};
+int targetValues[] = {0, 0, 0, 0};
 int targetSide = HIGHER;
 bool sendingCC = false;
 
