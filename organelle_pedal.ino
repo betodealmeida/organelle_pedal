@@ -7,6 +7,9 @@
 
 #include <Bounce.h>
 
+#define LOWER 0
+#define HIGHER 1
+
 const int midiChannel = 15;
 const int expressionCC[] = {21, 22, 23, 24};
 const int sustainCC = 25;
@@ -17,12 +20,22 @@ Bounce switches[] = {
     Bounce(8, 10),
 };
 
+// When we switch the knob beinf affected the expression pedal
+// doesn't affect it immediately. Instead, there's a target value
+// that need to be hit.
+//
+// For example, if knob is at 50 and we switch to it when the
+// expression pedal is at 33, the value will only change when the
+// expression pedal reads 50 or more (HIGHER).
+const int targetValues[] = {-1, -1, -1, -1};
+const int targetSide = HIGHER;
+const bool sendingCC = false;
+
 const int sustainPin = 15;
 Bounce sustainPedal = Bounce(sustainPin, 10);  // 10 ms debounce
 
 int activeKnob = -1;
 int i, pinNumber;
-int previousExpressionValue = -1;
 
 void setup() {
   pinMode(sustainPin, INPUT_PULLUP);
@@ -39,23 +52,6 @@ void setup() {
 }
 
 void loop() {
-  for (i = 0; i < 4; i++) {
-    // read switches
-    if (switches[i].update() && switches[i].fallingEdge()) {
-      activeKnob = activeKnob != i ? i : -1;
-    }
-    
-    // turn active knob LED on
-    digitalWrite(9 + i, activeKnob == i ? HIGH : LOW);
-  }
-
-  // read expression pedal
-  int expressionValue = analogRead(A0) / 8;
-  if ((expressionValue != previousExpressionValue) && (activeKnob != -1)) {
-    usbMIDI.sendControlChange(expressionCC[activeKnob], expressionValue, midiChannel);
-    previousExpressionValue = expressionValue;
-  }
-
   // read sustain pedal
   if (sustainPedal.update()) {
     // signal goes HIGH when pedal is pressed
@@ -64,6 +60,40 @@ void loop() {
     } else if (sustainPedal.fallingEdge()) {
       usbMIDI.sendControlChange(sustainCC, 0, midiChannel);
     }
+  }
+
+  // read expression pedal
+  int expressionValue = analogRead(A0) / 8;
+
+  // are we active?
+  if (activeKnob != -1) {
+    if (sendingCC) {
+      if (expressionValue != targetValue[activeKnob]) {
+        usbMIDI.sendControlChange(expressionCC[activeKnob], expressionValue, midiChannel);
+        targetValue[activeKnob] = expressionValue;
+      }
+    } else if (((targetSide == HIGHER) && (expressionValue >= targetValues[activeKnob])) || ((targetSide == LOWER) && (expressionValue =< targetValues[activeKnob]))) {
+      sendingCC = true;
+    }
+  }
+
+  for (i = 0; i < 4; i++) {
+    // read switches
+    if (switches[i].update() && switches[i].fallingEdge()) {
+      activeKnob = activeKnob != i ? i : -1;
+      sendingCC = false;
+
+      if (activeKnob != -1) {
+        if (expressionValue < targetValues[activeKnob]) {
+          targetSide = HIGHER;
+        } else if (expressionValue > targetValues[activeKno]) {
+          targetSide = LOWER;
+        }
+      }
+    }
+    
+    // turn active knob LED on
+    digitalWrite(9 + i, activeKnob == i ? HIGH : LOW);
   }
 
   // discard incoming MIDI messages
