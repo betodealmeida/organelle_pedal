@@ -20,13 +20,13 @@ Bounce switches[] = {
     Bounce(8, 10),
 };
 
-/* When we switch the knob beinf affected the expression pedal
+/* When we switch the knob being affected the expression pedal
  * doesn't affect it immediately. Instead, there's a target value
- * that need to be hit.
+ * that needs to be hit.
  *
- * For example, if knob is at 50 and we switch to it when the
- * expression pedal is at 33, the value will only change when the
- * expression pedal reads 50 or more (HIGHER).
+ * For example, if knob 1 is at 50 and we switch to it when the
+ * expression pedal is currently at 33, the value will only start
+ * changing when the expression pedal reads 50 or more (HIGHER).
  */
 int targetValues[] = {0, 0, 0, 0};
 int targetSide = HIGHER;
@@ -86,6 +86,9 @@ void loop() {
     // read switches
     if (switches[i].update() && switches[i].fallingEdge()) {
       activeKnob = activeKnob != i ? i : -1;
+
+      // stop sending CC when we switch to a different knor or
+      // toggle the current one off
       sendingCC = false;
 
       if (activeKnob != -1) {
